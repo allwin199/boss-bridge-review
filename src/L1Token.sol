@@ -7,6 +7,7 @@ contract L1Token is ERC20 {
     uint256 private constant INITIAL_SUPPLY = 1_000_000;
 
     constructor() ERC20("BossBridgeToken", "BBT") {
+        // e total we are minting 1e18 tokens
         _mint(msg.sender, INITIAL_SUPPLY * 10 ** decimals());
     }
 }
