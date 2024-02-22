@@ -27,10 +27,13 @@ import { L1Vault } from "./L1Vault.sol";
 contract L1BossBridge is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
+    // e depositing tokens, you can't do too many
     uint256 public DEPOSIT_LIMIT = 100_000 ether;
 
+    // e one bridge per token
     IERC20 public immutable token;
     L1Vault public immutable vault;
+    // Users who can "send" a token from L2 -> L1
     mapping(address account => bool isSigner) public signers;
 
     error L1BossBridge__DepositLimitReached();
@@ -54,6 +57,7 @@ contract L1BossBridge is Ownable, Pausable, ReentrancyGuard {
         _unpause();
     }
 
+    // q hey what happens if we diable an account mid-flight??
     function setSigner(address account, bool enabled) external onlyOwner {
         signers[account] = enabled;
     }
