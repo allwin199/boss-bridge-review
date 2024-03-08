@@ -29,8 +29,11 @@ contract L1BossBridge is Ownable, Pausable, ReentrancyGuard {
 
     uint256 public DEPOSIT_LIMIT = 100_000 ether;
 
+    // e one bridge per token
     IERC20 public immutable token;
+    // e one vault per token
     L1Vault public immutable vault;
+    // e signers are Users who can "send" a token from L2 -> L1
     mapping(address account => bool isSigner) public signers;
 
     error L1BossBridge__DepositLimitReached();
@@ -67,10 +70,28 @@ contract L1BossBridge is Ownable, Pausable, ReentrancyGuard {
      * @param l2Recipient The address of the user who will receive the tokens on L2
      * @param amount The amount of tokens to deposit
      */
+
+    // Let's see an exploit
+    // Alice: approves token to the bridge
+    // and she called `depositTokensToL2`
+    // Bob see's that Alice has approved to the tokens
+    // Now bob will front run alice
+    // bob will call `depositTokensToL2` and make sure his transaction go though first
+    // from will be `alice` address
+    // to will be `bob's` address
+    // amount will be token.balanceOf(alice) // entire balance of alice
+    // Now bob will steal all the money from `alice`
+
+    // To mitigate this issue
+    // from should be removed from params
+    // and `msg.sender` should be used instead of `from`
     function depositTokensToL2(address from, address l2Recipient, uint256 amount) external whenNotPaused {
         if (token.balanceOf(address(vault)) + amount > DEPOSIT_LIMIT) {
             revert L1BossBridge__DepositLimitReached();
         }
+
+        // @audit-high
+        // If a user approves the bridge, any other user can steal their funds
         token.safeTransferFrom(from, address(vault), amount);
 
         // Our off-chain service picks up this event and mints the corresponding tokens on L2
@@ -118,6 +139,7 @@ contract L1BossBridge is Ownable, Pausable, ReentrancyGuard {
 
         (address target, uint256 value, bytes memory data) = abi.decode(message, (address, uint256, bytes));
 
+        // q slither said this is bad, is that ok?
         (bool success,) = target.call{ value: value }(data);
         if (!success) {
             revert L1BossBridge__CallFailed();
