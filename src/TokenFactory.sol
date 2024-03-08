@@ -21,9 +21,30 @@ contract TokenFactory is Ownable {
      * @param contractBytecode The bytecode of the new token
      */
     function deployToken(string memory symbol, bytes memory contractBytecode) public onlyOwner returns (address addr) {
+        // @audit-high this won't work on zk-sync
+        // https://docs.zksync.io/build/developer-reference/differences-with-ethereum.html#create-create2
         assembly {
             addr := create(0, add(contractBytecode, 0x20), mload(contractBytecode))
         }
+
+        // create(v, p, n)
+        // create new contract with code mem[p…(p+n)) and send v wei and return the new address; returns 0 on error
+        // create(0, add(contractBytecode, 0x20), mload(contractBytecode))
+        // v = 0
+        // since it is a contract creation we are sending no wei
+        // add(contractBytecode, 0x20)
+        // 0x20 will be at top of the stack
+        // contractBytecode will be at bottom of the stack
+        // this code is saying take the `0x20`bytes of `contractBytecode` and load it into `stack`
+        // mload(contractBytecode)
+        // load `contractBytecode` into the memory
+        // create(0, add(contractBytecode, 0x20), mload(contractBytecode))
+        // will return the new address
+        // returns 0 on error
+
+        // addr :=
+        // setting the returned address in `addr`
+
         s_tokenToAddress[symbol] = addr;
         emit TokenDeployed(symbol, addr);
     }

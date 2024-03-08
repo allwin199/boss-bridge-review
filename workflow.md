@@ -25,3 +25,7 @@
 - This off chain node will lock the L2 tokens
 - back into the L2 vault.
 - now L1 vault can unlock the locked L1Tokens
+
+---
+
+- Each vault works with 1 token
