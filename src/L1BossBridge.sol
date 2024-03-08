@@ -27,9 +27,11 @@ import { L1Vault } from "./L1Vault.sol";
 contract L1BossBridge is Ownable, Pausable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
+    // @audit-info/gas this should be constant
     uint256 public DEPOSIT_LIMIT = 100_000 ether;
 
     // e one bridge per token
+    // @audit-info/gas this should be immutable
     IERC20 public immutable token;
     // e one vault per token
     L1Vault public immutable vault;
@@ -92,10 +94,15 @@ contract L1BossBridge is Ownable, Pausable, ReentrancyGuard {
 
         // @audit-high
         // If a user approves the bridge, any other user can steal their funds
+
+        // @audit-high
+        // If the vault approves the bridge, attacker can steal funds from the vault
         token.safeTransferFrom(from, address(vault), amount);
 
         // Our off-chain service picks up this event and mints the corresponding tokens on L2
+        // @audit-info should follow CEI
         emit Deposit(from, l2Recipient, amount);
+        // emit before external call
     }
 
     /*

